@@ -1,10 +1,12 @@
+#!/usr/bin/python3.6
 import requests
 from requests.auth import HTTPBasicAuth
 from requests.auth import HTTPDigestAuth
-from optparse import OptionParser
-import oauthlib
+#from optparse import OptionParser
+#import oauthlib
 import argparse
-import pprint
+import socket
+import sys
 
 
 # py-ci -a basic -u "admin" -p "12345678" -l [list] 192.168.0.4 -h host
@@ -21,44 +23,70 @@ def main():
     parser.add_argument("--type", "-t", help="Action to carry out, search or inject, default search", action="store", type=str, dest="type")
     args = parser.parse_args(testargs)
 
-    host = None
-    port = None
-    auth = None
-    file = None
 
+def start(args):
+
+    #check for host
     if args.host:
         host = args.host
-        if args.port:
-            port = args.port
-        else:
-            port = 80
-        if args.file:
-            file = readfile(args.file)
-        else:
-            print("host missing")
     else:
-        print("host missing")
+        print("ERROR: No target host specified")
+        sys.exit(1)
+
+    # check for port else set to 80
+    if args.port:
+        port = args.port
+    else:
+        port = 80
+
+    #check for word list file
+    if args.file:
+        try:
+            file = open(args.file, 'r').read().splitlines()
+        except FileNotFoundError:
+            print("ERROR: Failed to find " + args.file)
+            sys.exit(1)
 
     if args.auth:
-        if args.user:
-            if args.password:
-                auth = HTTPDigestAuth(args.user, args.password)
-                if args.type == "inject":
-                    inject(file, host, port, auth)
-                elif args.type == "search":
-                    probe(file, host, auth, port)
-                else:
-                    search(file, host, port, auth)
-                    #print("Invalid test type")
-            else:
-                print("password missing")
+
+        if args.auth == "basic":
+            auth = HTTPBasicAuth()
+        elif args.auth == "digest":
+            auth = HTTPDigestAuth()
         else:
-            print("username missing")
+            print("ERROR: Unknown auth type " + args.auth)
+            sys.exit(1)
+
+        if args.user:
+            auth.username = args.user
+        else:
+            print("ERROR: No username specified")
+            sys.exit(1)
+
+        if args.password:
+            auth.password = args.password
+        else:
+            print("ERROR: No password specified")
+            sys.exit(1)
+
+    if args.type:
+        if args.type == "inject":
+            inject(file, host, port, auth)
+        elif args.type == "search":
+            search(file, host, port, auth)
+    else:
+        print("ERROR: No password specified")
+        sys.exit(1)
 
 
 def readfile(uri):
-    file = open(uri, 'r').read().splitlines()
-    return file
+    try:
+        file = open(uri, 'r').read().splitlines()
+        return file
+    except FileNotFoundError:
+        print("Error File not found")
+        sys.exit(1)
+
 
 
 def search(wordlist, host, port, auth=None,):
@@ -71,6 +99,24 @@ def search(wordlist, host, port, auth=None,):
             response = session.get(url, auth=auth)
             results.append((response.status_code, url))
         print_results(results)
+
+
+def listen():
+
+    icmp_socket = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
+    icmp_socket.settimeout(5)
+
+    try:
+        count = 0
+        while count < 3:
+            print("listening")
+            data = icmp_socket.recv(1024)
+            header = data[:20]
+            ip = header[-8:-4]
+            print(str(ip[0]) + "." + str(ip[1]) + "." + str(ip[2]) + "." + str(ip[3]))
+
+    except socket.timeout:
+        print("Timed out waiting")
 
 
 def inject():
