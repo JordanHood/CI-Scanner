@@ -13,7 +13,7 @@ from time import sleep
 # py-ci -a basic -u "admin" -p "12345678" -l [list] 192.168.0.4 -h host
 
 def main():
-    testargs = ["-t", "search",  "-a", "basic", "-u", "root", "-p", "root", "-l", "wordlists/sorted", "-w", "http://192.168.0.200/cgi-bin/admin/"]
+    # testargs = ["-t", "search",  "-a", "basic", "-u", "root", "-p", "root", "-l", "wordlists/wordlist", "-w", "http://192.168.0.200/cgi-bin/admin/"]
     parser = argparse.ArgumentParser()
     parser.add_argument("--auth", "-a", help="Type of authentication to use against target, default none", action="store", type=str, dest="auth")
     parser.add_argument("--username", "-u", help="Username to use on remote host", action="store", type=str, dest="user")
@@ -22,8 +22,12 @@ def main():
     parser.add_argument("--host", "-w", help="Remote host to target", action="store", type=str, dest="host")
     parser.add_argument("--port", "-n", help="Port to attempt scan on", action="store", type=int, dest="port")
     parser.add_argument("--type", "-t", help="Action to carry out, search or inject, default search", action="store", type=str, dest="type")
-    args = parser.parse_args(testargs)
-    start(args)
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit()
+    else: 
+        args = parser.parse_args()
+        start(args)
 
 def start(args):
 
