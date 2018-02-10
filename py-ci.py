@@ -7,12 +7,13 @@ from requests.auth import HTTPDigestAuth
 import argparse
 import socket
 import sys
+from time import sleep
 
 
 # py-ci -a basic -u "admin" -p "12345678" -l [list] 192.168.0.4 -h host
 
 def main():
-    testargs = ["-a", "basic", "-u", "admin", "-p", "12345678", "-l", "./wordlist", "-w", "http://192.168.0.4/cgi-bin/adv/"]
+    testargs = ["-t", "search",  "-a", "basic", "-u", "root", "-p", "root", "-l", "wordlists/sorted", "-w", "http://192.168.0.200/cgi-bin/admin/"]
     parser = argparse.ArgumentParser()
     parser.add_argument("--auth", "-a", help="Type of authentication to use against target, default none", action="store", type=str, dest="auth")
     parser.add_argument("--username", "-u", help="Username to use on remote host", action="store", type=str, dest="user")
@@ -22,7 +23,7 @@ def main():
     parser.add_argument("--port", "-n", help="Port to attempt scan on", action="store", type=int, dest="port")
     parser.add_argument("--type", "-t", help="Action to carry out, search or inject, default search", action="store", type=str, dest="type")
     args = parser.parse_args(testargs)
-
+    start(args)
 
 def start(args):
 
@@ -48,25 +49,18 @@ def start(args):
             sys.exit(1)
 
     if args.auth:
-
+        if args.user is None:
+            print("ERROR: No username specified")
+            sys.exit(1)
+        if args.password is None:
+            print("ERROR: No username specified")
+            sys.exit(1)
         if args.auth == "basic":
-            auth = HTTPBasicAuth()
+            auth = HTTPBasicAuth(args.user, args.password)
         elif args.auth == "digest":
             auth = HTTPDigestAuth()
         else:
             print("ERROR: Unknown auth type " + args.auth)
-            sys.exit(1)
-
-        if args.user:
-            auth.username = args.user
-        else:
-            print("ERROR: No username specified")
-            sys.exit(1)
-
-        if args.password:
-            auth.password = args.password
-        else:
-            print("ERROR: No password specified")
             sys.exit(1)
 
     if args.type:
@@ -75,7 +69,7 @@ def start(args):
         elif args.type == "search":
             search(file, host, port, auth)
     else:
-        print("ERROR: No password specified")
+        print("ERROR: No type specified")
         sys.exit(1)
 
 
@@ -96,8 +90,12 @@ def search(wordlist, host, port, auth=None,):
         session = requests.session()
         for i in range(0, len(wordlist)):
             url = host + wordlist[i]
-            response = session.get(url, auth=auth)
-            results.append((response.status_code, url))
+            try:
+                response = session.get(url, auth=auth)
+                results.append((response.status_code, url))
+                sleep(0.5) # sleep for half second so we dont overload the device
+            except requests.exceptions.ConnectionError:
+                results.append(("Connection refused", url))
         print_results(results)
 
 
